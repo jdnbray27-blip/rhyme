@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Rhyme Time</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; height:100%; }
+  body {
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background:#fdf3e7; color:#3b2e24;
+    display:flex; flex-direction:column; align-items:center;
+    padding:14px 14px 10px; overflow:hidden; user-select:none; min-height:100%;
+  }
+
+  .starcount {
+    position:fixed; top:8px; right:10px; font-size:15px; font-weight:800; color:#b8860b;
+    background:#fff; border-radius:10px; padding:5px 10px; box-shadow:0 1px 0 #f0d9a8;
+  }
+  .gear { position:fixed; top:8px; left:10px; width:36px; height:36px; border-radius:50%; border:none;
+          background:#fff; box-shadow:0 1px 0 #f0d9a8; font-size:17px; cursor:pointer; }
+
+  .prompt { margin-top:36px; font-size:20px; font-weight:700; color:#8a6a3a; text-align:center; }
+  .prompt b { color:#d2691e; }
+
+  .target-row { display:flex; align-items:center; gap:14px; margin:10px 0 6px; }
+  .target-card {
+    background:#fff; border-radius:24px; padding:14px 22px; box-shadow:0 4px 0 #f0d9a8;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  .target-pic { font-size:min(22vw, 100px); line-height:1; }
+  .target-word { font-size:20px; font-weight:800; color:#d2691e; }
+
+  .speaker {
+    width:54px; height:54px; border:none; border-radius:50%; background:#fff;
+    box-shadow:0 3px 0 #f0d9a8; font-size:26px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .speaker:active { transform:translateY(2px); box-shadow:none; }
+  .speaker.bump { animation:bump .3s ease; }
+  @keyframes bump { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+
+  .answers { display:flex; gap:16px; margin-top:22px; flex-wrap:wrap; justify-content:center; }
+  .ans {
+    width:min(26vw,130px); height:min(26vw,130px); border-radius:22px; border:none;
+    background:#fff; box-shadow:0 4px 0 #f0d9a8;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    cursor:pointer;
+  }
+  .ans:active { transform:translateY(3px); box-shadow:none; }
+  .ans .pic { font-size:min(13vw,56px); line-height:1; }
+  .ans .word { font-size:13px; font-weight:700; color:#8a6a3a; }
+  .ans.wrong { animation:wiggle .32s ease; }
+  .ans.correct { animation:winpulse .5s ease; background:#eaffe8; box-shadow:0 4px 0 #a8dca0; }
+  @keyframes wiggle {
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(7px)}
+    60%{transform:translateX(-5px)} 80%{transform:translateX(3px)}
+  }
+  @keyframes winpulse { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  .ans.fade { opacity:.25; pointer-events:none; }
+
+  .hooray { margin-top:20px; text-align:center; display:none; }
+  .hooray.on { display:block; animation:pop .25s ease-out; }
+  @keyframes pop { from{transform:scale(.6);opacity:0} to{transform:scale(1);opacity:1} }
+  .hooray .txt { font-size:28px; font-weight:800; color:#d2691e; }
+  .nextbtn {
+    margin-top:12px; border:none; border-radius:16px; padding:14px 28px; font-size:19px; font-weight:800;
+    background:#f4a300; color:#fff; box-shadow:0 2px 0 #c67e00; cursor:pointer;
+  }
+  .nextbtn:active { transform:translateY(2px); box-shadow:none; }
+
+  .confetti-piece {
+    position:fixed; top:-30px; font-size:26px; pointer-events:none; animation:fall linear forwards;
+  }
+  @keyframes fall { to { transform:translateY(110vh) rotate(360deg); opacity:.2; } }
+
+  .panel { position:fixed; inset:0; background:rgba(60,45,25,.5); display:none; align-items:center; justify-content:center; z-index:9; }
+  .panel.on { display:flex; }
+  .panel .box2 { background:#fff; border-radius:18px; padding:20px; width:min(90vw,380px); }
+  .panel h3 { margin:0 0 10px; font-size:17px; }
+  .panel .row { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; }
+  .panel button { margin-top:16px; width:100%; border:none; border-radius:12px; padding:11px; font-size:15px;
+    font-weight:700; background:#f4a300; color:#fff; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<button class="gear" id="gear">&#9881;</button>
+<div class="starcount" id="starCount">&#11088; 0</div>
+
+<div class="prompt" id="promptText">Which one rhymes with <b id="promptWord">this</b>?</div>
+
+<div class="target-row">
+  <div class="target-card">
+    <div class="target-pic" id="targetPic"></div>
+    <div class="target-word" id="targetWord"></div>
+  </div>
+  <button class="speaker" id="speaker">&#128266;</button>
+</div>
+
+<div class="answers" id="answers"></div>
+
+<div class="hooray" id="hooray">
+  <div class="txt">&#127881; Hooray!</div>
+  <button class="nextbtn" id="nextBtn">Next one</button>
+</div>
+
+<div class="panel" id="panel">
+  <div class="box2">
+    <h3>Grown-up settings</h3>
+    <div class="row"><input type="checkbox" id="audioOn" checked> <span>Say the words out loud</span></div>
+    <div class="row"><span>Stars earned this session:</span> <b id="sessionStars">0</b></div>
+    <div class="row"><span>Wrong taps this session:</span> <b id="sessionMiss">0</b></div>
+    <button id="closePanel">Close</button>
+  </div>
+</div>
+
+<script>
+/* ---- word bank: grouped by rhyme family, emoji verified against unicodedata.name() ---- */
+const WORDS = [
+  { w:'cat',   e:'\u{1F408}', f:'at' },  { w:'hat',   e:'\u{1F3A9}', f:'at' },
+  { w:'bat',   e:'\u{1F987}', f:'at' },  { w:'rat',   e:'\u{1F400}', f:'at' },
+
+  { w:'van',   e:'\u{1F690}', f:'an' },  { w:'fan',   e:'\u{1FAAD}', f:'an' },
+  { w:'can',   e:'\u{1F96B}', f:'an' },  { w:'man',   e:'\u{1F468}', f:'an' },
+
+  { w:'dog',   e:'\u{1F436}', f:'og' },  { w:'frog',  e:'\u{1F438}', f:'og' },
+
+  { w:'car',   e:'\u{1F697}', f:'ar' },  { w:'star',  e:'\u{2B50}',  f:'ar' },
+  { w:'jar',   e:'\u{1FAD9}', f:'ar' },  { w:'shark', e:'\u{1F988}', f:'ar' },
+
+  { w:'bee',   e:'\u{1F41D}', f:'ee' },  { w:'tree',  e:'\u{1F333}', f:'ee' },
+  { w:'key',   e:'\u{1F511}', f:'ee' },
+
+  { w:'fox',   e:'\u{1F98A}', f:'ox' },  { w:'box',   e:'\u{1F4E6}', f:'ox' },
+
+  { w:'cake',  e:'\u{1F382}', f:'ake' }, { w:'snake', e:'\u{1F40D}', f:'ake' },
+
+  { w:'moon',  e:'\u{1F319}', f:'oon' }, { w:'spoon', e:'\u{1F944}', f:'oon' },
+  { w:'balloon', e:'\u{1F388}', f:'oon' },
+
+  { w:'ring',  e:'\u{1F48D}', f:'ing' }, { w:'king',  e:'\u{1F451}', f:'ing' },
+
+  { w:'house', e:'\u{1F3E0}', f:'ouse' }, { w:'mouse', e:'\u{1F42D}', f:'ouse' },
+
+  { w:'clock', e:'\u{1F550}', f:'ock' }, { w:'sock',  e:'\u{1F9E6}', f:'ock' },
+  { w:'rock',  e:'\u{1FAA8}', f:'ock' },
+
+  { w:'snail', e:'\u{1F40C}', f:'ail' }, { w:'mail',  e:'\u{2709}\u{FE0F}', f:'ail' },
+  { w:'whale', e:'\u{1F433}', f:'ail' },
+
+  { w:'sheep', e:'\u{1F411}', f:'eep' }, { w:'sleep', e:'\u{1F634}', f:'eep' },
+
+  { w:'ball',  e:'\u{26BD}',  f:'all' }, { w:'wall',  e:'\u{1F9F1}', f:'all' },
+
+  // distractor-only words, no family partner, never chosen as a target
+  { w:'pig',   e:'\u{1F437}', f:null }, { w:'sun',   e:'\u{2600}\u{FE0F}', f:null },
+  { w:'egg',   e:'\u{1F95A}', f:null }, { w:'bug',   e:'\u{1F41B}', f:null },
+];
+
+const familyCounts = {};
+WORDS.forEach(x => { if (x.f) familyCounts[x.f] = (familyCounts[x.f]||0) + 1; });
+const TARGETABLE = WORDS.filter(x => x.f && familyCounts[x.f] >= 2);
+
+let miss = {};          // word -> wrong taps this session (used for weighting, not shown)
+let sessionMiss = 0;
+let stars = 0;
+let audioOn = true;
+let cur = null;         // current target word object
+let choices = [];        // 3 answer objects, choices[correctIdx] rhymes with cur
+let correctIdx = -1;
+let locked = false;
+
+const $ = id => document.getElementById(id);
+
+function speak(t) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t);
+  u.rate = 0.85; u.pitch = 1.15;
+  speechSynthesis.speak(u);
+}
+function say(t) { if (audioOn) speak(t); }
+
+function pickTarget() {
+  const pool = TARGETABLE.filter(x => x.w !== (cur && cur.w));
+  const weighted = [];
+  pool.forEach(x => {
+    const m = miss[x.w] || 0;
+    const weight = 1 + m * 2;
+    for (let i = 0; i < weight; i++) weighted.push(x);
+  });
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+
+function pickChoices(target) {
+  const sameFamily = WORDS.filter(x => x.f === target.f && x.w !== target.w);
+  const correct = sameFamily[Math.floor(Math.random() * sameFamily.length)];
+  const others = WORDS.filter(x => x.f !== target.f && x.w !== target.w);
+  const shuffledOthers = others.slice().sort(() => Math.random() - 0.5);
+  const wrong1 = shuffledOthers[0];
+  const wrong2 = shuffledOthers.find(x => x.w !== wrong1.w);
+  const arr = [correct, wrong1, wrong2].sort(() => Math.random() - 0.5);
+  return { arr, correctIdx: arr.indexOf(correct) };
+}
+
+function startRound() {
+  locked = false;
+  cur = pickTarget();
+  const picked = pickChoices(cur);
+  choices = picked.arr;
+  correctIdx = picked.correctIdx;
+  $('hooray').classList.remove('on');
+  render();
+  say('Which one rhymes with ' + cur.w + '?');
+}
+
+function render() {
+  $('targetPic').textContent = cur.e;
+  $('targetWord').textContent = cur.w;
+  $('promptWord').textContent = cur.w;
+
+  const wrap = $('answers'); wrap.innerHTML = '';
+  choices.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'ans';
+    b.dataset.i = i;
+    b.innerHTML = `<div class="pic">${c.e}</div><div class="word">${c.w}</div>`;
+    b.onclick = () => tapAnswer(i);
+    wrap.appendChild(b);
+  });
+}
+
+function tapAnswer(i) {
+  if (locked) return;
+  const el = document.querySelector(`.ans[data-i="${i}"]`);
+  if (i === correctIdx) {
+    locked = true;
+    el.classList.add('correct');
+    document.querySelectorAll('.ans').forEach((a, idx) => { if (idx !== i) a.classList.add('fade'); });
+    stars++;
+    $('starCount').textContent = '\u2B50 ' + stars;
+    $('sessionStars').textContent = stars;
+    launchConfetti();
+    setTimeout(() => {
+      $('hooray').classList.add('on');
+      say(cur.w + ' rhymes with ' + choices[i].w + '!');
+    }, 200);
+  } else {
+    miss[choices[i].w] = (miss[choices[i].w]||0) + 1;
+    sessionMiss++;
+    $('sessionMiss').textContent = sessionMiss;
+    el.classList.remove('wrong');
+    void el.offsetWidth;
+    el.classList.add('wrong');
+    say('Try again!');
+  }
+}
+
+function launchConfetti() {
+  const bits = ['\u{1F389}','\u2B50','\u{1F38A}','\u2728'];
+  for (let i = 0; i < 16; i++) {
+    const d = document.createElement('div');
+    d.className = 'confetti-piece';
+    d.textContent = bits[Math.floor(Math.random()*bits.length)];
+    d.style.left = Math.random()*100 + 'vw';
+    d.style.animationDuration = (1.2 + Math.random()*0.8) + 's';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 2200);
+  }
+}
+
+$('nextBtn').onclick = startRound;
+$('gear').onclick = () => $('panel').classList.add('on');
+$('closePanel').onclick = () => $('panel').classList.remove('on');
+$('panel').onclick = e => { if (e.target === $('panel')) $('panel').classList.remove('on'); };
+$('audioOn').onchange = e => audioOn = e.target.checked;
+$('speaker').onclick = () => {
+  speak(cur.w);
+  $('speaker').classList.remove('bump');
+  void $('speaker').offsetWidth;
+  $('speaker').classList.add('bump');
+};
+
+startRound();
+</script>
+</body>
+</html>
